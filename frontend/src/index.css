@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   CSS VARIABLES — swapped between light / dark mode
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --bg-page:        #0d0f1a;
+  --bg-card:        rgba(22, 25, 40, 0.75);
+  --bg-input:       rgba(13, 15, 26, 0.85);
+  --bg-hover:       rgba(255,255,255,0.04);
+  --border-card:    rgba(255,255,255,0.07);
+  --border-input:   rgba(255,255,255,0.09);
+  --text-primary:   #f1f5f9;
+  --text-secondary: rgba(241,245,249,0.55);
+  --text-muted:     rgba(241,245,249,0.30);
+  --shadow-card:    0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4);
+  --radial-1:       rgba(99,102,241,0.15);
+  --radial-2:       rgba(139,92,246,0.12);
+  --scrollbar-track: #0b0d15;
+  --scrollbar-thumb: #1f2235;
+  --brand-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+html.light {
+  --bg-page:        #f4f6fb;
+  --bg-card:        rgba(255,255,255,0.85);
+  --bg-input:       rgba(243,244,246,0.9);
+  --bg-hover:       rgba(0,0,0,0.03);
+  --border-card:    rgba(0,0,0,0.08);
+  --border-input:   rgba(0,0,0,0.12);
+  --text-primary:   #111827;
+  --text-secondary: rgba(17,24,39,0.60);
+  --text-muted:     rgba(17,24,39,0.35);
+  --shadow-card:    0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  --radial-1:       rgba(99,102,241,0.07);
+  --radial-2:       rgba(139,92,246,0.05);
+  --scrollbar-track:#e5e7eb;
+  --scrollbar-thumb:#9ca3af;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════ */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    @apply font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -10%, var(--radial-1) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 110%, var(--radial-2) 0%, transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+
+  input, select, textarea { @apply outline-none; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTS — all use CSS vars so they switch automatically
+   ═══════════════════════════════════════════════════════════ */
+@layer components {
+  .glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    box-shadow: var(--shadow-card);
+    @apply backdrop-blur-xl rounded-2xl;
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:-translate-y-0.5;
+  }
+  .glass-card-hover:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 16px 40px rgba(0,0,0,0.12);
+    border-color: rgba(99,102,241,0.25);
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
+           font-semibold text-sm text-white
+           bg-gradient-brand shadow-glow-brand
+           transition-all duration-200
+           hover:shadow-[0_0_30px_rgba(99,102,241,0.55)] hover:scale-[1.02]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+           disabled:hover:scale-100;
+  }
+
+  .btn-secondary {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-card);
+    color: var(--text-secondary);
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
+           font-semibold text-sm transition-all duration-200 active:scale-[0.98];
+  }
+  .btn-secondary:hover {
+    background: rgba(99,102,241,0.08);
+    border-color: rgba(99,102,241,0.3);
+    color: var(--text-primary);
+  }
+
+  .btn-ghost {
+    color: var(--text-muted);
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  }
+  .btn-ghost:hover { background: var(--bg-hover); color: var(--text-secondary); }
+
+  .input-field {
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    color: var(--text-primary);
+    @apply w-full rounded-xl px-4 py-3 text-sm transition-all duration-200
+           focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500;
+  }
+  .input-field::placeholder { color: var(--text-muted); }
+  .input-field:hover { border-color: rgba(99,102,241,0.25); }
+
+  .input-label {
+    color: var(--text-muted);
+    @apply block text-xs font-semibold uppercase tracking-wider mb-2;
+  }
+
+  .badge-success { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30; }
+  .badge-pending { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-500 border border-amber-500/30; }
+  .badge-failed  { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-500 border border-rose-500/30; }
+  .badge-info    { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-500 border border-brand-500/30; }
+
+  .sidebar-item {
+    color: var(--text-secondary);
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+           transition-all duration-200 cursor-pointer;
+  }
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  .sidebar-item-active {
+    @apply sidebar-item text-brand-500 border border-brand-500/20;
+    background: rgba(99,102,241,0.10);
+  }
+  html.light .sidebar-item-active { background: rgba(99,102,241,0.12); }
+
+  .section-title { color: var(--text-primary); @apply text-lg font-bold tracking-tight; }
+  .section-subtitle { color: var(--text-muted); @apply text-sm font-medium; }
+
+  .table-header-cell { color: var(--text-muted); @apply px-4 py-3 text-left text-[11px] font-bold uppercase tracking-widest; }
+  .table-cell { color: var(--text-secondary); @apply px-4 py-3.5 text-sm; }
+  .table-row { border-bottom: 1px solid var(--border-card); @apply transition-colors duration-150 cursor-pointer; }
+  .table-row:hover { background: var(--bg-hover); }
+  .table-row-new { @apply table-row animate-new-row; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+  .text-primary   { color: var(--text-primary);   }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted     { color: var(--text-muted);     }
+
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #818cf8, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float { animation: float 6s ease-in-out infinite; }
+
+  .bg-mesh-grid {
+    background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+}
+
+@keyframes toast-in {
+  from { transform: translateX(100%) scale(0.9); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+@keyframes new-row {
+  0% { background: rgba(99,102,241,0.2); transform: scale(0.98); }
+  100% { background: transparent; transform: scale(1); }
+}
+
+.animate-new-row { animation: new-row 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
