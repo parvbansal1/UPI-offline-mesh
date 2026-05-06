@@ -28,9 +28,16 @@
 <div align="center">
 
 ### Real-Time React Dashboard
-<img src="./assets/dashboard.png" width="700" alt="React UI" />
+## Screenshots
 
-*(Add your frontend UI screenshots here)*
+<div align="center">
+
+### Dashboard
+
+<img src="./screenshots/photo.png" width="700"/>
+
+### Transaction Ledger
+<img src="./screenshots/photo2.png" width="700"/>
 
 </div>
 
