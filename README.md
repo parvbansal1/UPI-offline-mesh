@@ -27,17 +27,25 @@
 
 <div align="center">
 
-### Real-Time React Dashboard
-## Screenshots
+### Main Dashboard
+<img src="./screenshots/photo.png" width="900" alt="Dashboard" />
+<br/><br/>
 
-<div align="center">
+### Transaction Analytics
+<img src="./screenshots/photo2.png" width="700" alt="Analytics" />
+<br/><br/>
 
-### Dashboard
+### Mesh Network Topology
+<img src="./screenshots/photo3.png" width="700" alt="Topology" />
+<br/><br/>
 
-<img src="./screenshots/photo.png" width="700"/>
+### Manual Transaction Flow
+<img src="./screenshots/photo4.png" width="700" alt="Transaction Flow" />
+<br/><br/>
 
-### Transaction Ledger
-<img src="./screenshots/photo2.png" width="700"/>
+### Real-Time Transaction Ledger
+<img src="./screenshots/photo5.png" width="700" alt="Ledger" />
+<br/><br/>
 
 </div>
 
