@@ -1,20 +1,25 @@
 <div align="center">
-  <h1>🚀 UPI Offline Mesh Network</h1>
-  <h3>A Distributed, Offline-First Payment Routing System</h3>
+  <h1>🚀 UPI Offline Mesh</h1>
+  <h3>Production-Grade Distributed Payment Routing System</h3>
 
 [![Java 17](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/17/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3-6DB33F?style=for-the-badge&logo=spring&logoColor=white)](https://spring.io/projects/spring-boot)
-[![Architecture](https://img.shields.io/badge/Architecture-Distributed_Systems-blue?style=for-the-badge)](https://en.wikipedia.org/wiki/Distributed_computing)
-[![Security](https://img.shields.io/badge/Security-Hybrid_Cryptography-red?style=for-the-badge&logo=shield)](https://en.wikipedia.org/wiki/Hybrid_cryptosystem)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-7.4-231F20?style=for-the-badge&logo=apachekafka)](https://kafka.apache.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis)](https://redis.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 </div>
 
 ---
 
-> **UPI Offline Mesh** is a proof-of-concept backend that eliminates the need for active internet connectivity to perform UPI payments. It leverages an ad-hoc **Bluetooth-style mesh network** to route encrypted transactions device-to-device.
->
-> Imagine you are in a basement with zero connectivity. You send your friend ₹500. Your phone encrypts the payment and broadcasts it. The packet hops across nearby offline devices until *someone* eventually walks into a 4G internet zone and silently uploads it to the backend. The server securely decrypts, deduplicates the inevitable duplicate uploads, and settles the payment exactly once. 
+> **⚠️ CONCEPTUAL NOTE: DEFERRED, NOT REAL-TIME**
+> This system is designed for **Deferred Settlement**, not real-time clearing. When you send money in the offline mesh, it acts as a cryptographically secure IOU. The actual bank-level settlement only occurs once the encrypted packet physically reaches an internet-connected zone and is processed by this backend.
+
+**UPI Offline Mesh** is a full-stack, distributed backend system that enables digital UPI payments without active internet connectivity. It simulates a **Bluetooth-style mesh network** to route encrypted transactions peer-to-peer until a node connects to the internet.
+
+**The V2 Architecture** upgrades the system to a true production-grade distributed architecture utilizing **Kafka** for resilient message queuing, **Redis** for distributed atomic locks (idempotency), **PostgreSQL** for permanent ledger storage, and a **React/Vite** frontend for real-time mesh visualization.
 
 ---
 
@@ -22,187 +27,171 @@
 
 <div align="center">
 
-### Interactive Simulator Dashboard
-<img src="./assets/dashboard.png" width="700" alt="Dashboard UI" />
+### Real-Time React Dashboard
+<img src="./assets/dashboard.png" width="700" alt="React UI" />
 
-### Mesh Network in Action
-<img src="./assets/gossip.png" width="500" alt="Mesh Network Routing" />
-
-<sub>Visualizing the "Gossip Protocol" as encrypted packets hop between devices.</sub>
-
-### Transaction Ledger & Settlement
-<img src="./assets/ledger.png" width="700" alt="Transaction Ledger" />
+*(Add your frontend UI screenshots here)*
 
 </div>
 
 ## 🧠 The "Offline Payment" Problem
 
-Traditional digital payments (like UPI) operate on a synchronous, strictly-connected model. Both the sender and the bank core must establish a secure HTTPS connection in real-time to authorize a deduction. 
+Traditional digital payments (like UPI) operate on a synchronous, strictly-connected model. Both the sender and the bank core must establish a secure connection in real-time to authorize a deduction. 
 
 **The Challenge:** What happens in environments with zero cellular coverage? (e.g., dense basements, flights, remote rural areas, or during network outages).
 
-**The Solution:** This project introduces **Deferred Settlement via Mesh Routing**. By treating nearby mobile devices as an untrusted peer-to-peer router network, payments can safely travel physically (via people walking) until they hit an internet bridge, all while maintaining absolute cryptographic security and strict single-settlement guarantees.
+**The Solution:** **Deferred Settlement via Mesh Routing**. 
+Nearby mobile devices act as an untrusted peer-to-peer router network. Payments travel physically (via people walking) until they hit an internet bridge. The transaction is fully encrypted end-to-end, so intermediate phones act as blind carrier pigeons.
 
 ---
 
-## 🏗️ Engineering Deep Dive
+## 🏗️ Technical Architecture & Engineering Deep Dive
 
-Building an offline mesh requires solving three critical distributed systems and security challenges. Here is exactly how the backend engine is engineered to handle them:
+The system operates across a robust, multi-container microservice infrastructure to handle extreme concurrency, async processing, and race conditions.
 
-### 1. Zero-Trust Cryptography (The "Untrusted Intermediary" Problem)
-A random stranger's phone is carrying your payment packet. How do we stop them from reading the amount, changing the recipient, or stealing funds?
+### 1. The Distributed Ingestion Pipeline (Apache Kafka)
+In a mesh network, when a "bridge node" walks out of a basement and hits a 4G tower, it will instantly upload hundreds or thousands of cached packets.
+- **The Problem:** Processing RSA decryption and database transactions synchronously would immediately exhaust Tomcat HTTP threads and crash the backend.
+- **The Solution:** The Spring Boot `/api/bridge/ingest` REST controller acts purely as a Kafka Producer. It takes the incoming payload, fires it into a Kafka topic (`mesh-transactions-topic`), and instantly returns a `202 Accepted` to the mobile device. 
+- **Scale:** Dedicated Kafka Consumer groups then drain the queue at their own pace, ensuring the system remains highly available regardless of traffic spikes.
 
-**Implementation: Hybrid Cryptography (RSA-OAEP + AES-256-GCM)**
-Since RSA can only encrypt small payloads (~245 bytes for a 2048-bit key) and our JSON payload is larger, the system uses a standard TLS-style hybrid approach:
-1. The sender phone generates a fresh **AES-256 key** for *this specific packet*.
-2. The payment JSON is encrypted using **AES-256-GCM** (Galois/Counter Mode). GCM provides *authenticated encryption*.
-3. The AES key itself is then encrypted using the **Server's RSA-2048 Public Key**.
-4. The final packet payload becomes: `[256 bytes RSA-encrypted AES key] + [12 bytes IV] + [AES ciphertext & 16-byte GCM tag]`.
+### 2. The Atomic Idempotency Engine (Redis `SETNX`)
+Because packets are gossiped endlessly across the mesh, 10 different people might upload the *exact same payment packet* simultaneously. We must guarantee the sender is only debited once.
+- The Kafka consumer computes a `SHA-256` hash of the authenticated ciphertext.
+- It executes a Redis atomic lock: `SET packet_hash "CLAIMED" NX EX 86400` (Set if Not Exists, Expire in 24 hours).
+- **The Magic:** Redis operates on a single thread. Even if 50 Kafka consumer threads try to acquire this lock at the exact same nanosecond, Redis guarantees exactly *one* will succeed. The others receive a failure and gracefully drop the duplicate packet.
 
-**Why GCM?** It attaches an authentication tag. If an intermediate node flips even a *single bit* to try and change the amount, the GCM tag verification will fail during decryption on the backend, throwing a `AEADBadTagException`. The server is never tricked into processing tampered data.
+### 3. Zero-Trust Hybrid Cryptography (RSA-OAEP + AES-GCM)
+A random stranger's phone is carrying your payment packet. They cannot be allowed to see the amount or alter the receiver.
+- The sender phone generates a fresh, single-use **AES-256 key** and encrypts the payload (`sender, receiver, amount, nonce, timestamp`) using **AES-256-GCM**.
+- The AES key is encrypted using the Server's **RSA-2048 Public Key**.
+- **Tamper Resistance:** GCM provides authenticated encryption. If an intermediate node maliciously flips even a *single bit* to try and change the payment amount, the GCM auth tag verification will fail upon backend decryption, throwing an `AEADBadTagException`. The packet is destroyed.
 
-### 2. The Atomic Idempotency Engine (The "Duplicate Storm" Problem)
-Because of the nature of a mesh network, a single payment might be picked up by 10 different people. If 5 of them walk outside and connect to 4G at the exact same millisecond, they will all POST the exact same packet to `/api/bridge/ingest`. If we aren't careful, the sender gets charged ₹2500 instead of ₹500.
-
-**Implementation: Compare-And-Set Hashing**
-Before *any* expensive RSA decryption happens, the server calculates the `SHA-256` hash of the authenticated ciphertext. It then attempts an atomic lock using a `ConcurrentHashMap`:
-```java
-// Simulated Redis SETNX equivalent
-Instant prev = idempotencyCache.putIfAbsent(packetHash, now);
-if (prev != null) {
-    return Outcome.DUPLICATE_DROPPED;
-}
-```
-`putIfAbsent` is atomic at the JVM level. Even if 100 threads execute this on the exact same nanosecond, exactly *one* thread will return `null` and proceed to decrypt and settle. The other 99 threads instantly drop the request.
-
-*(In production, this map is simply replaced with Redis: `SET key NX EX 86400`).* We also implement a fallback `UNIQUE` database index on `packet_hash` as a final line of defense against race conditions.
-
-### 3. Replay Attack Mitigation
-What stops a malicious bridge node from saving an encrypted packet today, and re-uploading it next week to drain the sender's account again?
-
-**Implementation: Temporal Constraints & Nonces**
-Inside the encrypted payload, the sender embeds a `signedAt` epoch timestamp and a unique `UUID` nonce. 
-1. The backend automatically drops any packet where `signedAt` is older than 24 hours (enforcing a strict TTL).
-2. The encrypted nonce guarantees that even if Alice sends Bob ₹500 twice legitimately, the ciphertexts will be completely different, resulting in different SHA-256 hashes. Thus, a true duplicate ciphertext is guaranteed to be a network replay, which gets caught by the Idempotency Engine.
+### 4. ACID Settlement Ledger (PostgreSQL & Optimistic Locking)
+Once a packet passes decryption and replay-attack validation (checking the 24-hour TTL and UUID nonce), it enters the financial settlement phase.
+- Using Spring Data JPA and `@Transactional`, the system executes the debit and credit logic within a strict ACID-compliant **PostgreSQL** database.
+- **Defense in Depth:** The `Account` entities utilize `@Version` optimistic locking. If two extremely edge-case transactions bypass Kafka and Redis somehow, the database will throw an `OptimisticLockException` rather than allowing a double-spend race condition.
 
 ---
 
-## 📊 System Architecture & Data Flow
+## 📊 System Architecture Flow
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         SENDER PHONE (offline)                          │
-│  PaymentInstruction { sender, receiver, amount, pinHash, nonce, time }  │
-│              │                                                          │
-│              ▼ Encrypt with Server's RSA Public Key                     │
-│   MeshPacket { packetId, ttl, createdAt, ciphertext }                   │
-└──────────────────────────────────────┬──────────────────────────────────┘
-                                       │ Bluetooth Gossip Protocol
-                                       ▼
-        ┌─────────┐  hop   ┌─────────┐  hop   ┌─────────┐
-        │ Node A  │ ─────▶ │ Node B  │ ─────▶ │ Bridge  │ ◀── Walks outside
-        └─────────┘        └─────────┘        └────┬────┘     Gets 4G Signal
-                                                   │
-                                                   ▼ HTTPS POST
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     SPRING BOOT BACKEND (This Project)                  │
-│                                                                         │
-│  [1] Hash ciphertext (SHA-256)                                          │
-│  [2] Atomic claim via IdempotencyService (Drops Duplicates instantly)   │
-│  [3] Decrypt: RSA-OAEP unwraps AES key, AES-GCM decrypts/verifies data  │
-│  [4] Freshness Check: Is signedAt within 24h?                           │
-│  [5] Atomic DB Settlement: @Transactional Debit & Credit operations     │
-└─────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                 OFFLINE SENDER DEVICE                     │
+│  [AES-GCM Encrypted Payload + RSA Encrypted AES Key]      │
+└─────────┬─────────────────────────────────────────────────┘
+          │ (Bluetooth Low Energy Gossip)
+          ▼
+┌──────────────────┐      ┌───────────────┐
+│ Carrier Node A   │ ───► │ Bridge Node   │ ◀── Walks outside
+│ (No Internet)    │      │ (Gets 4G)     │
+└──────────────────┘      └───────┬───────┘
+                                  │ HTTPS POST
+┌─────────────────────────────────┴─────────────────────────┐
+│                     SPRING BOOT BACKEND                   │
+│                                                           │
+│  [1] REST API Controller                                  │
+│       │ (Produces to Topic - Async Handoff)               │
+│  [2] Apache Kafka (Message Buffer)                        │
+│       │ (Consumed by Worker Thread)                       │
+│  [3] Redis (Atomic `SETNX` Deduplication)                 │
+│       │ (Proceeds only if Unique)                         │
+│  [4] Hybrid Crypto Decryption & Freshness Validation      │
+│       │                                                   │
+│  [5] PostgreSQL (@Transactional Ledger Settlement)        │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Tech Stack & Infrastructure
+## 🚀 Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Core Framework** | Java 17, Spring Boot 3.3 | Enterprise-grade REST API routing and Dependency Injection. |
-| **Data Persistence** | H2 (In-Memory), Spring Data JPA | Relational mapping, ACID-compliant ledger transactions (`@Transactional`). |
-| **Concurrency Control**| `ConcurrentHashMap`, JVM Threads | Handling multi-threaded duplicate storms via atomic operations. |
-| **Cryptography** | Java Cryptography Extension (JCE) | RSA-2048 and AES-256-GCM cipher implementations. |
-| **Frontend UI** | HTML5, CSS3, Vanilla JS (Fetch) | Interactive visualizer for the simulated mesh nodes. |
+| **Frontend** | React 18, Vite, Tailwind CSS | Real-time interactive UI, mesh visualizer, API integration. |
+| **Backend API** | Java 17, Spring Boot 3.3 | REST API, Event-driven Kafka Producers and Consumers. |
+| **Message Queue**| Apache Kafka 7.4 & Zookeeper | Decoupling burst HTTP ingestion from heavy decryption. |
+| **Caching** | Redis 7 | Distributed atomic locks for flawless duplicate dropping. |
+| **Database** | PostgreSQL 15 | Permanent ACID transaction ledger with Optimistic Locking. |
+| **Infrastructure**| Docker & Docker Compose | Containerized execution of the entire data infrastructure. |
 
 ---
 
-## ⚡ Installation & Quick Start
+## ⚡ Installation & Developer Setup
 
-### 1. Requirements
-You only need **JDK 17** installed and added to your `PATH`. 
-*Note: You do not need to install Maven, PostgreSQL, or Redis. The project uses the Maven Wrapper and in-memory components so you can run the demo immediately.*
+### Prerequisites
+- **Docker & Docker Compose** (Required for running Postgres, Redis, Kafka, Zookeeper).
+- **Java 17+** (JDK must be installed).
+- **Node.js 18+** (Required for the Vite/React Frontend).
 
-### 2. Run the Server
-Open a terminal in the project directory:
-
-**Windows:**
-```cmd
-mvnw.cmd spring-boot:run
-```
-
-**Mac / Linux:**
+### Step 1: Start the Infrastructure (Docker)
+Open a terminal in the root project directory and start the microservices:
 ```bash
+docker-compose up -d
+```
+*Wait ~15-30 seconds. You can verify Kafka is ready by checking `docker ps` to ensure all containers are `(healthy)`.*
+
+### Step 2: Start the Spring Boot Backend
+In a new terminal at the project root:
+```bash
+# Windows
+mvnw.cmd spring-boot:run
+
+# Mac / Linux
 ./mvnw spring-boot:run
 ```
-*(Dependencies will be downloaded on the first run. Subsequent runs take ~3-5 seconds).*
+*The Java backend connects to the Dockerized Postgres/Redis/Kafka and runs on `localhost:8080`.*
 
-### 3. Open the Interactive Mesh Dashboard
-Navigate to **[http://localhost:8080](http://localhost:8080)** to access the visualizer.
-
----
-
-## 📖 Usage Guide: Running the Demo
-
-The dashboard simulates the entire offline lifecycle. Follow these steps:
-
-1. **Inject into Mesh:** Select a sender, receiver, and amount. Click "Inject". The server creates an encrypted packet and assigns it to a simulated "offline" phone.
-2. **Run Gossip Round:** Click this button a few times. Watch the packet jump from device to device. The TTL (Time To Live) will decrement with each hop.
-3. **Bridges Upload to Backend:** A specific device is designated as the "Internet Bridge". Clicking this simulates the device gaining a 4G connection and POSTing all its cached packets to the server.
-4. **View Ledger:** The server instantly deduplicates, decrypts, and settles the payment. The transaction ledger and account balances will update securely.
-
-### 🧪 Running the Concurrency Tests
-To truly test the robustness of the backend, run the test suite. The `IdempotencyConcurrencyTest` fires three threads delivering the exact same packet simultaneously to verify that exactly one thread succeeds while the others safely fail.
+### Step 3: Start the React Frontend
+Open a third terminal and navigate to the `frontend` directory:
 ```bash
-./mvnw test
+cd frontend
+npm install
+npm run dev
 ```
+*The React application will start. Open `http://localhost:5173` in your browser.*
 
 ---
 
-## 🛠️ Internal Project Structure
+## 📖 Usage Guide
+
+Open your browser to the Vite local server (e.g., `http://localhost:5173`).
+
+1. **Inject:** Create a new payment. The React app tells the backend to generate an encrypted offline packet.
+2. **Gossip:** Simulate the Bluetooth mesh by propagating packets across virtual devices.
+3. **Bridge Upload:** Trigger the internet connection simulation. The React app commands the bridge nodes to POST their cached packets to the Spring Boot backend.
+4. **Observe:** Watch the backend logs as packets hit Kafka, get deduped by Redis, and finally settle in PostgreSQL. The React UI will update to reflect the new ledger states!
+
+---
+
+## ⚠️ Honest Limitations of the Concept
+
+I want this README to be honest about distributed systems limitations. Here is what this architecture **does not** solve:
+
+1. **Not Real-Time / No Sender Verification:** Because this is a **deferred settlement** system, the receiver has no way to cryptographically verify the sender has the funds *at the moment of the transaction*. It is essentially a secure IOU. If the sender's account is empty when the packet eventually reaches the backend, the backend rejects it, and the receiver is out ₹500. *(True offline systems like UPI Lite solve this using pre-funded hardware secure elements).*
+2. **Double Spending:** A malicious sender with ₹500 could send an offline packet to Person A in a basement, walk to another basement, and send a packet to Person B. Whichever packet reaches the internet backend first will settle; the second will fail due to insufficient funds.
+3. **Bluetooth Physics:** Forming background BLE GATT connections between strangers' phones in real life is highly restricted by Android/iOS battery optimizations. This project simulates the mesh to focus on backend routing complexities.
+
+---
+
+## 🛠️ Project Structure
 
 ```bash
 upi-offline-mesh/
-├── pom.xml                                  
-├── src/main/
-│   ├── resources/
-│   │   ├── application.properties           # Server ports, H2 Config
-│   │   └── templates/dashboard.html         # Frontend UI
-│   └── java/com/demo/upimesh/
-│       ├── model/                           # JPA Entities (Account, Transaction)
-│       ├── crypto/                          # HybridCryptoService.java (RSA+AES logic)
-│       ├── service/                         
-│       │   ├── IdempotencyService.java      # Atomic duplicate dropping
-│       │   ├── SettlementService.java       # @Transactional DB ledger logic
-│       │   ├── MeshSimulatorService.java    # The Gossip engine
-│       │   └── BridgeIngestionService.java  # THE PIPELINE (Hash -> Check -> Decrypt -> Settle)
-│       └── controller/                      # REST APIs (/api/bridge/ingest)
-└── src/test/                                # Multi-threading & Tamper Tests
+├── docker-compose.yml                       # Infra: Postgres, Redis, Kafka, Zookeeper
+├── frontend/                                # React Vite Application
+│   ├── src/
+│   ├── package.json
+│   └── tailwind.config.js
+├── pom.xml                                  # Spring Boot Dependencies
+└── src/main/java/com/demo/upimesh/          # Java Backend Code
+    ├── config/                              # Kafka & Redis configurations
+    ├── controller/                          # REST API Endpoints
+    ├── crypto/                              # RSA + AES Hybrid Cryptography
+    ├── model/                               # JPA Entities (Postgres)
+    └── service/                             # Kafka Consumers, Redis Locks, Ledger Logic
 ```
-
----
-
-## 📋 Limitations & Roadmap to Production
-
-This is a teaching/portfolio demo. While the cryptography and idempotency are production-shaped, the surrounding infrastructure is simplified. To deploy this to an enterprise banking core, the following upgrades are required:
-
-1. **Database:** Swap the H2 in-memory DB for a highly available **PostgreSQL** cluster.
-2. **Idempotency:** Replace the JVM-local `ConcurrentHashMap` with a distributed **Redis** cluster (`SET NX EX`).
-3. **Key Management:** Move the RSA Private keys out of JVM memory and into a Hardware Security Module (HSM) like **AWS KMS**.
-4. **Physical Mesh:** Replace the software `MeshSimulatorService` with real Android Kotlin code utilizing **Wi-Fi Direct** or **BLE GATT** connections between physical phones.
-5. **Sender Verification:** Without internet, receivers cannot cryptographically verify a sender has enough funds. True offline UPI requires an on-device secure element (hardware wallet) to pre-fund and lock balances offline.
 
 ---
 
@@ -214,8 +203,7 @@ If you're a recruiter, engineer, or just someone interested in backend architect
 
 **Parv Bansal**
 
-<!-- Update these links with your actual profiles! -->
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/your-profile)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/parvbansal11)
 [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github)](https://github.com/parvbansal1)
 
 </div>
